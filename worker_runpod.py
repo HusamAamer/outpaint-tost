@@ -81,7 +81,7 @@ def generate(input):
     values = input["input"]
 
     input_image = values['input_image']
-    input_image = download_file(url=input_image, save_dir='')
+    input_image = download_file(url=input_image, save_dir='/content')
     image = Image.open(input_image).convert("RGB")
     width = values['width']
     height = values['height']
