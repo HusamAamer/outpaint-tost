@@ -16,7 +16,6 @@ RUN adduser --disabled-password --gecos '' camenduru && \
 
 USER camenduru
 
-
 COPY ./requirements.txt /content/requirements.txt
 RUN pip install -r /content/requirements.txt && \
     GIT_LFS_SKIP_SMUDGE=1 git clone -b dev https://github.com/camenduru/diffusers-image-outpaint-hf /content/outpaint
