@@ -1,0 +1,21 @@
+# Python dependencies extracted from Dockerfile
+# Base packages for image/video processing
+opencv-python
+imageio
+imageio-ffmpeg
+ffmpeg-python
+av
+numpy==1.26.4
+
+# RunPod serverless framework
+runpod
+
+# AI/ML packages with specific versions
+transformers==4.44.2
+accelerate==0.34.2
+diffusers==0.30.3
+
+# Note: PyTorch is already included in the base image runpod/pytorch:2.2.1-py3.10-cuda12.1.1-devel-ubuntu22.04
+# torch>=2.2.1 (provided by base image)
+# torchvision (provided by base image)
+# torchaudio (provided by base image)

@@ -8,13 +8,13 @@ from pipeline_fill_sd_xl import StableDiffusionXLFillPipeline
 from PIL import Image, ImageDraw
 
 with torch.inference_mode():
-    config = ControlNetModel_Union.load_config("/content/model/union/config_promax.json")
+    config = ControlNetModel_Union.load_config("/runpod-volume/model/union/config_promax.json")
     controlnet_model = ControlNetModel_Union.from_config(config)
-    state_dict = load_state_dict("/content/model/union/diffusion_pytorch_model_promax.safetensors")
-    model, _, _, _, _ = ControlNetModel_Union._load_pretrained_model(controlnet_model, state_dict, "/content/model/union/diffusion_pytorch_model_promax.safetensors", "/content/model/union")
+    state_dict = load_state_dict("/runpod-volume/model/union/diffusion_pytorch_model_promax.safetensors")
+    model, _, _, _, _ = ControlNetModel_Union._load_pretrained_model(controlnet_model, state_dict, "/runpod-volume/model/union/diffusion_pytorch_model_promax.safetensors", "/runpod-volume/model/union")
     model.to(device="cuda", dtype=torch.float16)
-    vae = AutoencoderKL.from_pretrained("/content/model/vae-fix", torch_dtype=torch.float16).to("cuda")
-    pipe = StableDiffusionXLFillPipeline.from_pretrained("/content/model/lightning", torch_dtype=torch.float16, vae=vae, controlnet=model, variant="fp16").to("cuda")
+    vae = AutoencoderKL.from_pretrained("/runpod-volume/model/vae-fix", torch_dtype=torch.float16).to("cuda")
+    pipe = StableDiffusionXLFillPipeline.from_pretrained("/runpod-volume/model/lightning", torch_dtype=torch.float16, vae=vae, controlnet=model, variant="fp16").to("cuda")
 
 def infer(image, width, height, overlap_width, num_inference_steps, prompt_input=None):
     source = image
@@ -81,7 +81,7 @@ def generate(input):
     values = input["input"]
 
     input_image = values['input_image']
-    input_image = download_file(url=input_image, save_dir='/content')
+    input_image = download_file(url=input_image, save_dir='')
     image = Image.open(input_image).convert("RGB")
     width = values['width']
     height = values['height']
@@ -91,64 +91,16 @@ def generate(input):
     # width_height = values['width_height']
     # width, height = map(int, width_height.split('x'))
     output_image = infer(image, width, height, overlap_width, num_inference_steps, prompt_input)
-    output_image[num_inference_steps+1][1].save("/content/outpaint_tost.png")
-
-    result = "/content/outpaint_tost.png"
-    try:
-        notify_uri = values['notify_uri']
-        del values['notify_uri']
-        notify_token = values['notify_token']
-        del values['notify_token']
-        discord_id = values['discord_id']
-        del values['discord_id']
-        if(discord_id == "discord_id"):
-            discord_id = os.getenv('com_camenduru_discord_id')
-        discord_channel = values['discord_channel']
-        del values['discord_channel']
-        if(discord_channel == "discord_channel"):
-            discord_channel = os.getenv('com_camenduru_discord_channel')
-        discord_token = values['discord_token']
-        del values['discord_token']
-        if(discord_token == "discord_token"):
-            discord_token = os.getenv('com_camenduru_discord_token')
-        job_id = values['job_id']
-        del values['job_id']
-        default_filename = os.path.basename(result)
-        with open(result, "rb") as file:
-            files = {default_filename: file.read()}
-        payload = {"content": f"{json.dumps(values)} <@{discord_id}>"}
-        response = requests.post(
-            f"https://discord.com/api/v9/channels/{discord_channel}/messages",
-            data=payload,
-            headers={"Authorization": f"Bot {discord_token}"},
-            files=files
-        )
-        response.raise_for_status()
-        result_url = response.json()['attachments'][0]['url']
-        notify_payload = {"jobId": job_id, "result": result_url, "status": "DONE"}
-        web_notify_uri = os.getenv('com_camenduru_web_notify_uri')
-        web_notify_token = os.getenv('com_camenduru_web_notify_token')
-        if(notify_uri == "notify_uri"):
-            requests.post(web_notify_uri, data=json.dumps(notify_payload), headers={'Content-Type': 'application/json', "Authorization": web_notify_token})
-        else:
-            requests.post(web_notify_uri, data=json.dumps(notify_payload), headers={'Content-Type': 'application/json', "Authorization": web_notify_token})
-            requests.post(notify_uri, data=json.dumps(notify_payload), headers={'Content-Type': 'application/json', "Authorization": notify_token})
-        return {"jobId": job_id, "result": result_url, "status": "DONE"}
-    except Exception as e:
-        error_payload = {"jobId": job_id, "status": "FAILED"}
-        try:
-            if(notify_uri == "notify_uri"):
-                requests.post(web_notify_uri, data=json.dumps(error_payload), headers={'Content-Type': 'application/json', "Authorization": web_notify_token})
-            else:
-                requests.post(web_notify_uri, data=json.dumps(error_payload), headers={'Content-Type': 'application/json', "Authorization": web_notify_token})
-                requests.post(notify_uri, data=json.dumps(error_payload), headers={'Content-Type': 'application/json', "Authorization": notify_token})
-        except:
-            pass
-        return {"jobId": job_id, "result": f"FAILED: {str(e)}", "status": "FAILED"}
-    finally:
-        if os.path.exists(result):
-            os.remove(result)
-        if os.path.exists(input_image):
-            os.remove(input_image)
+    result_image = output_image[num_inference_steps+1][1]
+    
+    import io
+    import base64
+    buffer = io.BytesIO()
+    result_image.save(buffer, format='PNG')
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    return {"image": image_base64}
+    
 
 runpod.serverless.start({"handler": generate})
